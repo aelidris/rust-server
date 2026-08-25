@@ -1,0 +1,14 @@
+server:
+  host: "127.0.0.1"
+  ports: [8080, 8081]
+  client_max_body_size: 1048576 # 1MB
+  error_pages:
+    404: "error_pages/404.html"
+    500: "error_pages/500.html"
+
+routes:
+  - path: "/"
+    root: "./public"
+    methods: ["GET"]
+    default_file: "index.html"
+    directory_listing: false
