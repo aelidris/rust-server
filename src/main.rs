@@ -1,6 +1,7 @@
 mod config;
 mod server;
 mod router;
+mod cgi;
 
 use server::Server;
 

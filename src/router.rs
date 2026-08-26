@@ -40,4 +40,14 @@ impl Router {
 
         full_path
     }
+
+    /// Checks if a request target and matched route qualify for CGI execution
+    pub fn is_cgi_request(&self, route: &RouteConfig, file_path: &PathBuf) -> bool {
+        if let Some(extensions) = &route.cgi_extensions {
+            if let Some(ext) = file_path.extension().and_then(|e| e.to_str()) {
+                return extensions.iter().any(|allowed| allowed.trim_start_matches('.') == ext);
+            }
+        }
+        false
+    }
 }

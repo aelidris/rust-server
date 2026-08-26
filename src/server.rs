@@ -95,26 +95,67 @@ impl Server {
                                             if let Some(route) = router.match_route(path) {
                                                 if router.is_method_allowed(route, method) {
                                                     let file_path = router.resolve_file_path(route, path);
-                                                    println!("Matched route! Resolved file path: {:?}", file_path);
+                                                    println!("Matched route! Resolved path: {:?}", file_path);
 
-                                                    // Read file from filesystem instead of hardcoded string
-                                                    match std::fs::read_to_string(&file_path) {
-                                                        Ok(contents) => {
-                                                            let response = format!(
-                                                                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n{}",
-                                                                contents.len(),
-                                                                contents
-                                                            );
-                                                            let _ = stream.write_all(response.as_bytes());
+                                                    // CHECK IF IT'S A CGI REQUEST
+                                                    if router.is_cgi_request(route, &file_path) {
+                                                        println!("Triggering CGI execution for: {:?}", file_path);
+                                                        
+                                                        // Extract query string if present (e.g., /cgi-bin/test.py?name=test)
+                                                        let path_parts: Vec<&str> = path.splitn(2, '?').collect();
+                                                        let query_string = path_parts.get(1).copied();
+
+                                                        // Collect headers for CGI env variables
+                                                        let mut headers = HashMap::new();
+                                                        for line in lines {
+                                                            if line.is_empty() { break; }
+                                                            if let Some((key, val)) = line.split_once(':') {
+                                                                headers.insert(key.trim().to_lowercase(), val.trim().to_string());
+                                                            }
                                                         }
-                                                        Err(_) => {
-                                                            let body = "<h1>404 Not Found</h1>";
-                                                            let response = format!(
-                                                                "HTTP/1.1 404 Not Found\r\nContent-Length: {}\r\n\r\n{}",
-                                                                body.len(),
-                                                                body
-                                                            );
-                                                            let _ = stream.write_all(response.as_bytes());
+
+                                                        // Execute the CGI script
+                                                        match crate::cgi::execute_cgi(&file_path, method, query_string, None, &headers) {
+                                                            Ok(script_output) => {
+                                                                // CGI scripts usually return their own headers + body
+                                                                let response = format!(
+                                                                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n",
+                                                                    script_output.len()
+                                                                );
+                                                                let _ = stream.write_all(response.as_bytes());
+                                                                let _ = stream.write_all(&script_output);
+                                                            }
+                                                            Err(e) => {
+                                                                eprintln!("CGI Execution Error: {}", e);
+                                                                let body = "<h1>500 Internal Server Error (CGI Failed)</h1>";
+                                                                let response = format!(
+                                                                    "HTTP/1.1 500 Internal Server Error\r\nContent-Length: {}\r\n\r\n{}",
+                                                                    body.len(),
+                                                                    body
+                                                                );
+                                                                let _ = stream.write_all(response.as_bytes());
+                                                            }
+                                                        }
+                                                    } else {
+                                                        // Fallback: Regular Static File Serving
+                                                        match std::fs::read_to_string(&file_path) {
+                                                            Ok(contents) => {
+                                                                let response = format!(
+                                                                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n{}",
+                                                                    contents.len(),
+                                                                    contents
+                                                                );
+                                                                let _ = stream.write_all(response.as_bytes());
+                                                            }
+                                                            Err(_) => {
+                                                                let body = "<h1>404 Not Found</h1>";
+                                                                let response = format!(
+                                                                    "HTTP/1.1 404 Not Found\r\nContent-Length: {}\r\n\r\n{}",
+                                                                    body.len(),
+                                                                    body
+                                                                );
+                                                                let _ = stream.write_all(response.as_bytes());
+                                                            }
                                                         }
                                                     }
                                                 } else {

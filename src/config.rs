@@ -25,6 +25,7 @@ pub struct RouteConfig {
     pub methods: Vec<String>,
     pub default_file: Option<String>,
     pub directory_listing: bool,
+    pub cgi_extensions: Option<Vec<String>>,
 }
 
 impl Config {

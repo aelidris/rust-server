@@ -12,3 +12,9 @@ routes:
     methods: ["GET"]
     default_file: "index.html"
     directory_listing: false
+
+  - path: "/cgi-bin"
+    root: "./cgi-bin"
+    methods: ["GET", "POST"]
+    directory_listing: false
+    cgi_extensions: [".py", ".sh"]
