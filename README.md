@@ -13,7 +13,7 @@ A custom HTTP/1.1-compliant web server built from scratch in Rust, utilizing non
 ## Prerequisites
 
 Make sure you have Rust and Cargo installed on your system. This project requires:
-- **Rust / Cargo** version `1.98.0` or higher (fully compatible with Cargo editions `2021+`)
+- **Rust / Cargo** version `1.98.0` or higher
 
 You can verify your installation by running:
 ```bash
