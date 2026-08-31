@@ -1,4 +1,5 @@
 use crate::config::Config;
+use crate::error::get_error_response;
 use mio::net::{TcpListener, TcpStream};
 use mio::{Events, Interest, Poll, Token};
 use std::error::Error;
@@ -156,12 +157,7 @@ impl Server {
                                                             }
                                                             Err(e) => {
                                                                 eprintln!("CGI Execution Error: {}", e);
-                                                                let body = "<h1>500 Internal Server Error (CGI Failed)</h1>";
-                                                                let response = format!(
-                                                                    "HTTP/1.1 500 Internal Server Error\r\nContent-Length: {}\r\n\r\n{}",
-                                                                    body.len(),
-                                                                    body
-                                                                );
+                                                                let response = get_error_response(500, "Internal Server Error");
                                                                 let _ = stream.write_all(response.as_bytes());
                                                             }
                                                         }
@@ -171,29 +167,18 @@ impl Server {
                                                             if file_path.is_file() {
                                                                 match std::fs::remove_file(&file_path) {
                                                                     Ok(_) => {
-                                                                        let body = "<h1>204 No Content</h1>";
                                                                         let response = format!(
                                                                             "HTTP/1.1 204 No Content\r\nContent-Length: 0\r\n\r\n"
                                                                         );
                                                                         let _ = stream.write_all(response.as_bytes());
                                                                     }
                                                                     Err(_) => {
-                                                                        let body = "<h1>403 Forbidden</h1>";
-                                                                        let response = format!(
-                                                                            "HTTP/1.1 403 Forbidden\r\nContent-Length: {}\r\n\r\n{}",
-                                                                            body.len(),
-                                                                            body
-                                                                        );
+                                                                        let response = get_error_response(403, "Forbidden");
                                                                         let _ = stream.write_all(response.as_bytes());
                                                                     }
                                                                 }
                                                             } else {
-                                                                let body = "<h1>404 Not Found</h1>";
-                                                                let response = format!(
-                                                                    "HTTP/1.1 404 Not Found\r\nContent-Length: {}\r\n\r\n{}",
-                                                                    body.len(),
-                                                                    body
-                                                                );
+                                                                let response = get_error_response(404, "Not Found");
                                                                 let _ = stream.write_all(response.as_bytes());
                                                             }
                                                         } else {
@@ -208,12 +193,7 @@ impl Server {
                                                                     let _ = stream.write_all(response.as_bytes());
                                                                 }
                                                                 Err(_) => {
-                                                                    let body = "<h1>404 Not Found</h1>";
-                                                                    let response = format!(
-                                                                        "HTTP/1.1 404 Not Found\r\nContent-Length: {}\r\n\r\n{}",
-                                                                        body.len(),
-                                                                        body
-                                                                    );
+                                                                    let response = get_error_response(404, "Not Found");
                                                                     let _ = stream.write_all(response.as_bytes());
                                                                 }
                                                             }
@@ -221,11 +201,11 @@ impl Server {
                                                         
                                                     }
                                                 } else {
-                                                    let response = "HTTP/1.1 405 Method Not Allowed\r\n\r\n";
+                                                    let response = get_error_response(405, "Method Not Allowed");
                                                     let _ = stream.write_all(response.as_bytes());
                                                 }
                                             } else {
-                                                let response = "HTTP/1.1 404 Not Found\r\n\r\n";
+                                                let response = get_error_response(404, "Not Found");
                                                 let _ = stream.write_all(response.as_bytes());
                                             }
                                         }
@@ -235,7 +215,7 @@ impl Server {
                                     clients.remove(&id);
                                 }
                                 Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                                    // Not ready yet
+                                    // The socket isn't ready with more data right now, so just do nothing and let the main loop continue polling other events without crashing
                                 }
                                 Err(e) => {
                                     eprintln!("Error reading from client {}: {}", id, e);

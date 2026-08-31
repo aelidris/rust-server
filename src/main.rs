@@ -2,6 +2,7 @@ mod config;
 mod server;
 mod router;
 mod cgi;
+mod error;
 
 use server::Server;
 

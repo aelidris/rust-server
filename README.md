@@ -47,3 +47,14 @@ curl -X DELETE -i http://127.0.0.1:8080/delete_me.txt
 ``` bash
 curl -X POST -d "param=value" -i http://127.0.0.1:8080/cgi-bin/post_test.py
 ```
+
+### Test Custom Error Pages (404 / 405):
+
+#### Test 404 Not Found
+``` bash
+curl -i http://127.0.0.1:8080/non_existent_page.html
+```
+#### Test 405 Method Not Allowed
+``` bash
+curl -X POST -i http://127.0.0.1:8080/index.html
+```
