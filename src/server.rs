@@ -105,19 +105,48 @@ impl Server {
                                                         let path_parts: Vec<&str> = path.splitn(2, '?').collect();
                                                         let query_string = path_parts.get(1).copied();
 
-                                                        // Collect headers for CGI env variables
+                                                        // Collect headers and find content length
                                                         let mut headers = HashMap::new();
-                                                        for line in lines {
+                                                        let mut content_length = 0;
+                                                        let mut body_bytes = Vec::new();
+                                                        
+                                                        let mut lines_iter = lines.peekable();
+                                                        for line in &mut lines_iter {
                                                             if line.is_empty() { break; }
                                                             if let Some((key, val)) = line.split_once(':') {
-                                                                headers.insert(key.trim().to_lowercase(), val.trim().to_string());
+                                                                let k = key.trim().to_lowercase();
+                                                                let v = val.trim().to_string();
+                                                                if k == "content-length" {
+                                                                    content_length = v.parse().unwrap_or(0);
+                                                                }
+                                                                headers.insert(k, v);
                                                             }
                                                         }
 
-                                                        // Execute the CGI script
-                                                        match crate::cgi::execute_cgi(&file_path, method, query_string, None, &headers) {
+                                                        // If it's a POST request with content, read the body
+                                                        if method.eq_ignore_ascii_case("POST") && content_length > 0 {
+                                                            let remaining_text: String = lines_iter.collect::<Vec<&str>>().join("\n");
+                                                            let mut body = remaining_text.into_bytes();
+                                                            
+                                                            while body.len() < content_length {
+                                                                let mut chunk = vec![0; content_length - body.len()];
+                                                                match stream.read(&mut chunk) {
+                                                                    Ok(0) => break,
+                                                                    Ok(n) => body.extend_from_slice(&chunk[..n]),
+                                                                    Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                                                                        continue;
+                                                                    }
+                                                                    Err(_) => break,
+                                                                }
+                                                            }
+                                                            body_bytes = body;
+                                                        }
+
+                                                        let body_arg = if body_bytes.is_empty() { None } else { Some(body_bytes.as_slice()) };
+
+                                                        // Execute the CGI script with the body payload
+                                                        match crate::cgi::execute_cgi(&file_path, method, query_string, body_arg, &headers) {
                                                             Ok(script_output) => {
-                                                                // CGI scripts usually return their own headers + body
                                                                 let response = format!(
                                                                     "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n",
                                                                     script_output.len()
