@@ -166,17 +166,28 @@ impl Server {
                                                             }
                                                         }
                                                     } else {
-                                                        // Fallback: Regular Static File Serving
-                                                        match std::fs::read_to_string(&file_path) {
-                                                            Ok(contents) => {
-                                                                let response = format!(
-                                                                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n{}",
-                                                                    contents.len(),
-                                                                    contents
-                                                                );
-                                                                let _ = stream.write_all(response.as_bytes());
-                                                            }
-                                                            Err(_) => {
+                                                        // Fallback: Regular Static File Serving or DELETE handling
+                                                        if method.eq_ignore_ascii_case("DELETE") {
+                                                            if file_path.is_file() {
+                                                                match std::fs::remove_file(&file_path) {
+                                                                    Ok(_) => {
+                                                                        let body = "<h1>204 No Content</h1>";
+                                                                        let response = format!(
+                                                                            "HTTP/1.1 204 No Content\r\nContent-Length: 0\r\n\r\n"
+                                                                        );
+                                                                        let _ = stream.write_all(response.as_bytes());
+                                                                    }
+                                                                    Err(_) => {
+                                                                        let body = "<h1>403 Forbidden</h1>";
+                                                                        let response = format!(
+                                                                            "HTTP/1.1 403 Forbidden\r\nContent-Length: {}\r\n\r\n{}",
+                                                                            body.len(),
+                                                                            body
+                                                                        );
+                                                                        let _ = stream.write_all(response.as_bytes());
+                                                                    }
+                                                                }
+                                                            } else {
                                                                 let body = "<h1>404 Not Found</h1>";
                                                                 let response = format!(
                                                                     "HTTP/1.1 404 Not Found\r\nContent-Length: {}\r\n\r\n{}",
@@ -185,7 +196,29 @@ impl Server {
                                                                 );
                                                                 let _ = stream.write_all(response.as_bytes());
                                                             }
-                                                        }
+                                                        } else {
+                                                            // Regular GET file serving code
+                                                            match std::fs::read_to_string(&file_path) {
+                                                                Ok(contents) => {
+                                                                    let response = format!(
+                                                                        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n{}",
+                                                                        contents.len(),
+                                                                        contents
+                                                                    );
+                                                                    let _ = stream.write_all(response.as_bytes());
+                                                                }
+                                                                Err(_) => {
+                                                                    let body = "<h1>404 Not Found</h1>";
+                                                                    let response = format!(
+                                                                        "HTTP/1.1 404 Not Found\r\nContent-Length: {}\r\n\r\n{}",
+                                                                        body.len(),
+                                                                        body
+                                                                    );
+                                                                    let _ = stream.write_all(response.as_bytes());
+                                                                }
+                                                            }
+                                                        }                                                 
+                                                        
                                                     }
                                                 } else {
                                                     let response = "HTTP/1.1 405 Method Not Allowed\r\n\r\n";

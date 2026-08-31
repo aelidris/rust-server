@@ -9,12 +9,12 @@ server:
 routes:
   - path: "/"
     root: "./public"
-    methods: ["GET"]
+    methods: ["GET", "DELETE"]
     default_file: "index.html"
     directory_listing: false
 
   - path: "/cgi-bin"
     root: "./cgi-bin"
-    methods: ["GET", "POST"]
+    methods: ["GET", "POST", "DELETE"]
     directory_listing: false
     cgi_extensions: [".py", ".sh"]

@@ -19,3 +19,31 @@ You can verify your installation by running:
 ```bash
 rustc --version
 cargo --version
+```
+
+## Running the Server
+### Start the server using Cargo:
+
+``` bash
+cargo run
+```
+
+## Testing Endpoints
+
+### Test GET (Static File):
+
+``` bash
+curl -i [http://127.0.0.1:8080/index.html](http://127.0.0.1:8080/index.html)
+```
+
+### Test DELETE:
+
+```bash
+curl -X DELETE -i [http://127.0.0.1:8080/delete_me.txt](http://127.0.0.1:8080/delete_me.txt)
+```
+
+### Test CGI Script (POST):
+
+``` bash
+curl -X POST -d "param=value" -i [http://127.0.0.1:8080/cgi-bin/post_test.py](http://127.0.0.1:8080/cgi-bin/post_test.py)
+```
