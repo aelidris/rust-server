@@ -93,10 +93,9 @@ impl Server {
                                             let method = parts[0];
                                             let path = parts[1];
 
-                                            // Collect headers first so we can check sessions/cookies
+                                            // Collect headers first so we can check sessions/cookies                                         
                                             let mut headers = HashMap::new();
-                                            let mut content_length = 0;
-                                            let mut body_bytes: Vec<u8> = Vec::new();
+                                            
 
                                             let mut lines_iter = lines.clone().peekable();
                                             for line in &mut lines_iter {
@@ -104,9 +103,6 @@ impl Server {
                                                 if let Some((key, val)) = line.split_once(':') {
                                                     let k = key.trim().to_lowercase();
                                                     let v = val.trim().to_string();
-                                                    if k == "content-length" {
-                                                        content_length = v.parse().unwrap_or(0);
-                                                    }
                                                     headers.insert(k, v);
                                                 }
                                             }

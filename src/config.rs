@@ -11,6 +11,7 @@ pub struct Config {
 }
 
 #[derive(Debug, Deserialize, Clone)]
+#[allow(dead_code)]
 pub struct ServerConfig {
     pub host: String,
     pub ports: Vec<u16>,
@@ -19,6 +20,7 @@ pub struct ServerConfig {
 }
 
 #[derive(Debug, Deserialize, Clone)]
+#[allow(dead_code)]
 pub struct RouteConfig {
     pub path: String,
     pub root: String,
