@@ -11,11 +11,13 @@ const SERVER_TOKEN: Token = Token(0);
 
 pub struct Server {
     config: Config,
+    router: crate::router::Router,
 }
 
 impl Server {
     pub fn new(config: Config) -> Self {
-        Self { config }
+        let router = crate::router::Router::new(config.clone());
+        Self { config, router }
     }
 
     pub fn run(&mut self) -> Result<(), Box<dyn Error>> {
@@ -91,15 +93,52 @@ impl Server {
                                             let method = parts[0];
                                             let path = parts[1];
 
-                                            let router = crate::router::Router::new(self.config.clone());
+                                            // Collect headers first so we can check sessions/cookies
+                                            let mut headers = HashMap::new();
+                                            let mut content_length = 0;
+                                            let mut body_bytes: Vec<u8> = Vec::new();
 
-                                            if let Some(route) = router.match_route(path) {
-                                                if router.is_method_allowed(route, method) {
-                                                    let file_path = router.resolve_file_path(route, path);
+                                            let mut lines_iter = lines.clone().peekable();
+                                            for line in &mut lines_iter {
+                                                if line.is_empty() { break; }
+                                                if let Some((key, val)) = line.split_once(':') {
+                                                    let k = key.trim().to_lowercase();
+                                                    let v = val.trim().to_string();
+                                                    if k == "content-length" {
+                                                        content_length = v.parse().unwrap_or(0);
+                                                    }
+                                                    headers.insert(k, v);
+                                                }
+                                            }
+
+                                            // Check session routes (/login, /profile) first using persistent self.router
+                                            if let Some((cookie_header, body)) = self.router.handle_session_route(path, &headers) {
+                                                let response = if !cookie_header.is_empty() {
+                                                    format!(
+                                                        "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n{}\r\nContent-Length: {}\r\n\r\n{}",
+                                                        cookie_header,
+                                                        body.len(),
+                                                        body
+                                                    )
+                                                } else {
+                                                    format!(
+                                                        "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: {}\r\n\r\n{}",
+                                                        body.len(),
+                                                        body
+                                                    )
+                                                };
+                                                let _ = stream.write_all(response.as_bytes());
+                                                clients.remove(&id);
+                                                continue;
+                                            }
+
+                                            if let Some(route) = self.router.match_route(path) {
+                                                if self.router.is_method_allowed(route, method) {
+                                                    let file_path = self.router.resolve_file_path(route, path);
                                                     println!("Matched route! Resolved path: {:?}", file_path);
 
                                                     // CHECK IF IT'S A CGI REQUEST
-                                                    if router.is_cgi_request(route, &file_path) {
+                                                    if self.router.is_cgi_request(route, &file_path) {
                                                         println!("Triggering CGI execution for: {:?}", file_path);
                                                         
                                                         // Extract query string if present (e.g., /cgi-bin/test.py?name=test)
@@ -109,7 +148,7 @@ impl Server {
                                                         // Collect headers and find content length
                                                         let mut headers = HashMap::new();
                                                         let mut content_length = 0;
-                                                        let mut body_bytes = Vec::new();
+                                                        let mut body_bytes: Vec<u8> = Vec::new();
                                                         
                                                         let mut lines_iter = lines.peekable();
                                                         for line in &mut lines_iter {

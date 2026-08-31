@@ -4,6 +4,11 @@ mod router;
 mod cgi;
 mod error;
 
+pub mod utils {
+    pub mod cookie;
+    pub mod session;
+}
+
 use server::Server;
 
 fn main() {

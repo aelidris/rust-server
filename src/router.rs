@@ -1,13 +1,20 @@
 use crate::config::{Config, RouteConfig};
+use crate::utils::cookie::{parse_cookies, create_set_cookie_header};
+use crate::utils::session::SessionManager;
 use std::path::PathBuf;
+use std::collections::HashMap;
 
 pub struct Router {
     config: Config,
+    pub session_manager: SessionManager,
 }
 
 impl Router {
     pub fn new(config: Config) -> Self {
-        Self { config }
+        Self {
+            config,
+            session_manager: SessionManager::new(3600), // 1 hour session duration
+        }
     }
 
     /// Finds a matching route for a given path, or returns None if 404
@@ -49,5 +56,31 @@ impl Router {
             }
         }
         false
+    }
+
+    /// Handles session-based test routes (/login && /profile)
+    pub fn handle_session_route(&mut self, path: &str, headers: &HashMap<String, String>) -> Option<(String, String)> {
+        if path == "/login" {
+            let session_id = self.session_manager.create_session();
+            let cookie_header = create_set_cookie_header("session_id", &session_id, Some(3600));
+            let body = "<html><body><h1>Session Created & Cookie Set Successfully!</h1></body></html>";
+            return Some((cookie_header, body.to_string()));
+        }
+
+        if path == "/profile" {
+            if let Some(cookie_str) = headers.get("cookie").or_else(|| headers.get("Cookie")) {
+                let cookies = parse_cookies(cookie_str);
+                if let Some(session_id) = cookies.get("session_id") {
+                    if self.session_manager.get_session(session_id).is_some() {
+                        let body = "<html><body><h1>Profile Page: Valid Session Found!</h1></body></html>";
+                        return Some(("".to_string(), body.to_string()));
+                    }
+                }
+            }
+            let body = "<html><body><h1>Unauthorized: No valid session cookie found.</h1></body></html>";
+            return Some(("".to_string(), body.to_string()));
+        }
+
+        None
     }
 }

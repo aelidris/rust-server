@@ -58,3 +58,22 @@ curl -i http://127.0.0.1:8080/non_existent_page.html
 ``` bash
 curl -X POST -i http://127.0.0.1:8080/index.html
 ```
+
+### State Management & Cookies
+The server includes a robust in-memory session manager and cookie parser (`utils/cookie.rs` and `utils/session.rs`) built to handle persistent user authentication states across non-blocking I/O connections:
+* **`/login`**: Generates a cryptographically secure session ID, registers it within the persistent session store, and issues an `HttpOnly` `Set-Cookie` header.
+* **`/profile`**: Parses incoming `Cookie` headers, extracts the `session_id`, and validates it against active server sessions to authorize access.
+
+
+### Testing State Management
+You can verify the session and cookie functionality using `curl`:
+
+1. **Test Login (Generates Session & Cookie):**
+``` bash
+curl -i http://127.0.0.1:8080/login
+```
+
+2. **Test Profile (Validates Session Cookie):**
+``` bash
+curl -i http://127.0.0.1:8080/profile -H "Cookie: session_id=YOUR_GENERATED_ID"
+```
