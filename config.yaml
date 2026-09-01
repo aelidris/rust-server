@@ -1,6 +1,6 @@
 server:
   host: "127.0.0.1"
-  ports: [8080, 8081]
+  ports: [8080, 8081, 8082, 9000]
   client_max_body_size: 1048576 # 1MB
   error_pages:
     404: "error_pages/404.html"
