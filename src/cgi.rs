@@ -64,5 +64,12 @@ pub fn execute_cgi(
     // Wait for the process to finish and capture output
     let output = child.wait_with_output()?;
 
+    if !output.status.success() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!("CGI script exited with non-zero status: {}", output.status),
+        ).into());
+    }
+
     Ok(output.stdout)
 }

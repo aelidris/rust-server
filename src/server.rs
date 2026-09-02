@@ -139,6 +139,17 @@ impl Server {
                                             }
                                         }
 
+                                        if let Some(cl_val) = headers.get("content-length") {
+                                            if let Ok(content_length) = cl_val.parse::<usize>() {
+                                                if content_length > self.config.server.client_max_body_size as usize {
+                                                    let response = get_error_response(413, "Payload Too Large");
+                                                    let _ = stream.write_all(response.as_bytes());
+                                                    clients.remove(&id);
+                                                    continue;
+                                                }
+                                            }
+                                        }
+
                                         if let Some((cookie_header, body)) = self.router.handle_session_route(path, &headers) {
                                             let response = if !cookie_header.is_empty() {
                                                 format!(

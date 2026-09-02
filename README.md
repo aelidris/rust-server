@@ -99,3 +99,24 @@ print(s.recv(4096).decode(errors="ignore"))
 s.close()
 '
 ```
+
+###Error Handling & Payload Limits
+
+***Dynamic Error Pages: Automatically reads and serves custom HTML error templates from the error_pages/ directory for codes 400, 403, 404, 405, 413, and 500.***
+
+***Payload Enforcement: Validates incoming Content-Length headers against the YAML-configured client_max_body_size, returning a 413 Payload Too Large error response if exceeded.***
+
+#### Testing Error Pages & Payload Limits
+
+#### Test 413 Payload Too Large
+
+``` bash
+curl -X POST -i http://127.0.0.1:8080/cgi-bin/test.py \
+  -H "Content-Length: 2000000" \
+  -d "exceeding limit body data"
+```
+
+### Test 500 Internal Server Error
+``` bash
+curl -i -X POST http://127.0.0.1:8080/cgi-bin/error_test.py
+```
