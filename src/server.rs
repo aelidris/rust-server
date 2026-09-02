@@ -173,6 +173,7 @@ impl Server {
                                                     let mut headers = HashMap::new();
                                                     let mut content_length = 0;
                                                     let mut body_bytes: Vec<u8> = Vec::new();
+                                                    let mut is_chunked = false;
                                                     
                                                     let mut lines_iter = lines.peekable();
                                                     for line in &mut lines_iter {
@@ -182,27 +183,41 @@ impl Server {
                                                             let v = val.trim().to_string();
                                                             if k == "content-length" {
                                                                 content_length = v.parse().unwrap_or(0);
+                                                            } else if k == "transfer-encoding" && v.to_lowercase().contains("chunked") {
+                                                                is_chunked = true;
                                                             }
                                                             headers.insert(k, v);
                                                         }
                                                     }
 
-                                                    if method.eq_ignore_ascii_case("POST") && content_length > 0 {
-                                                        let remaining_text: String = lines_iter.collect::<Vec<&str>>().join("\n");
-                                                        let mut body = remaining_text.into_bytes();
-                                                        
-                                                        while body.len() < content_length {
-                                                            let mut chunk = vec![0; content_length - body.len()];
-                                                            match stream.read(&mut chunk) {
-                                                                Ok(0) => break,
-                                                                Ok(n) => body.extend_from_slice(&chunk[..n]),
-                                                                Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                                                                    continue;
+                                                    if method.eq_ignore_ascii_case("POST") {
+                                                        if is_chunked {
+                                                            // Find where headers end (\r\n\r\n) in the initial read buffer
+                                                            let remaining_bytes = if let Some(pos) = request_str.find("\r\n\r\n") {
+                                                                let body_start_offset = pos + 4;
+                                                                // Get the slice of bytes from our original buffer starting after headers
+                                                                &buf[body_start_offset..n]
+                                                            } else {
+                                                                &[]
+                                                            };
+                                                            body_bytes = read_chunked_body(stream, remaining_bytes)?;
+                                                        } else if content_length > 0 {
+                                                            let remaining_text: String = lines_iter.collect::<Vec<&str>>().join("\n");
+                                                            let mut body = remaining_text.into_bytes();
+                                                            
+                                                            while body.len() < content_length {
+                                                                let mut chunk = vec![0; content_length - body.len()];
+                                                                match stream.read(&mut chunk) {
+                                                                    Ok(0) => break,
+                                                                    Ok(n) => body.extend_from_slice(&chunk[..n]),
+                                                                    Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                                                                        continue;
+                                                                    }
+                                                                    Err(_) => break,
                                                                 }
-                                                                Err(_) => break,
                                                             }
+                                                            body_bytes = body;
                                                         }
-                                                        body_bytes = body;
                                                     }
 
                                                     let body_arg = if body_bytes.is_empty() { None } else { Some(body_bytes.as_slice()) };
@@ -281,4 +296,48 @@ impl Server {
             }
         }
     }
+}
+
+fn read_chunked_body<R: Read>(stream: &mut R, initial_data: &[u8]) -> Result<Vec<u8>, std::io::Error> {
+    let mut body = Vec::new();
+    // Create a chained reader so we process initial buffered bytes before reading from the stream
+    let mut buffered_stream = std::io::Cursor::new(initial_data).chain(stream);
+    let mut line_buf = Vec::new();
+
+    loop {
+        line_buf.clear();
+        loop {
+            let mut byte = [0; 1];
+            match buffered_stream.read(&mut byte) {
+                Ok(0) => break,
+                Ok(_) => {
+                    line_buf.push(byte[0]);
+                    if line_buf.ends_with(b"\r\n") {
+                        break;
+                    }
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => continue,
+                Err(e) => return Err(e),
+            }
+        }
+
+        let line_str = String::from_utf8_lossy(&line_buf);
+        let hex_str = line_str.trim();
+        
+        let chunk_size = usize::from_str_radix(hex_str, 16).unwrap_or(0);
+        if chunk_size == 0 {
+            let mut terminator = [0; 2];
+            let _ = buffered_stream.read(&mut terminator);
+            break;
+        }
+
+        let mut chunk_data = vec![0; chunk_size];
+        buffered_stream.read_exact(&mut chunk_data)?;
+        body.extend_from_slice(&chunk_data);
+
+        let mut crlf = [0; 2];
+        let _ = buffered_stream.read(&mut crlf);
+    }
+
+    Ok(body)
 }
