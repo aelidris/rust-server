@@ -77,3 +77,25 @@ curl -i http://127.0.0.1:8080/login
 ``` bash
 curl -i http://127.0.0.1:8080/profile -H "Cookie: session_id=YOUR_GENERATED_ID"
 ```
+
+### Connection Management & Chunked Requests
+
+***Idle Connection Timeout: Automatically sweeps and cleans up inactive client sockets after 5 seconds using mio polling intervals and an Instant-based tracking sweep.***
+
+***Chunked Transfer Encoding: Natively parses stream-based POST requests using hex-length size decoding and 0\r\n\r\n boundary termination.***
+
+#### Testing Chunked Transfer Encoding
+You can verify the chunked request processing using Python or a raw socket script:
+``` bash
+python3 -c '
+import socket
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.connect(("127.0.0.1", 8080))
+s.sendall(b"POST /cgi-bin/test.py HTTP/1.1\r\nHost: localhost\r\nTransfer-Encoding: chunked\r\n\r\n")
+s.sendall(b"5\r\nHello\r\n")
+s.sendall(b"7\r\n World!\r\n")
+s.sendall(b"0\r\n\r\n")
+print(s.recv(4096).decode(errors="ignore"))
+s.close()
+'
+```
