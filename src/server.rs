@@ -6,6 +6,12 @@ use std::error::Error;
 use std::io::{Read, Write};
 use std::net::SocketAddr;
 use std::collections::HashMap;
+use std::time::{Instant, Duration};
+
+struct ClientConnection {
+    stream: TcpStream,
+    last_active: Instant,
+}
 
 pub struct Server {
     config: Config,
@@ -41,13 +47,29 @@ impl Server {
             listeners.insert(index, listener);
         }
 
-        // Map to keep track of connected client streams by their unique Token
-        let mut clients: HashMap<usize, TcpStream> = HashMap::new();
-        // Start client tokens after the listener tokens to prevent ID collision
+        // Map to keep track of connected client streams and timestamps by Token
+        let mut clients: HashMap<usize, ClientConnection> = HashMap::new();
         let mut next_token_id = self.config.server.ports.len();
+        let timeout_duration = Duration::from_secs(5); // 5 seconds request timeout
 
         loop {
-            poll.poll(&mut events, None)?;
+            // Poll with a 500ms timeout so the event loop wakes up periodically
+            poll.poll(&mut events, Some(Duration::from_millis(500)))?;
+
+            // Sweep and clean up expired connections
+            let now = Instant::now();
+            let mut timed_out_ids = Vec::new();
+            for (&id, client) in &clients {
+                if now.duration_since(client.last_active) > timeout_duration {
+                    timed_out_ids.push(id);
+                }
+            }
+            for id in timed_out_ids {
+                println!("Connection timeout for client token {}", id);
+                if let Some(mut client) = clients.remove(&id) {
+                    let _ = poll.registry().deregister(&mut client.stream);
+                }
+            }
 
             for event in events.iter() {
                 let token_id = event.token().0;
@@ -68,7 +90,10 @@ impl Server {
                                     Interest::READABLE,
                                 )?;
 
-                                clients.insert(client_token.0, stream);
+                                clients.insert(client_token.0, ClientConnection {
+                                    stream,
+                                    last_active: Instant::now(),
+                                });
                             }
                             Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                                 break;
@@ -82,7 +107,10 @@ impl Server {
                 } else {
                     // Handle existing client data streams
                     let id = token_id;
-                    if let Some(stream) = clients.get_mut(&id) {
+                    if let Some(client) = clients.get_mut(&id) {
+                        client.last_active = Instant::now(); // Refresh timeout timer on activity
+                        let stream = &mut client.stream;
+
                         let mut buf = [0; 1024];
                         match stream.read(&mut buf) {
                             Ok(0) => {
