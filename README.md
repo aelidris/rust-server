@@ -120,3 +120,16 @@ curl -X POST -i http://127.0.0.1:8080/cgi-bin/test.py \
 ``` bash
 curl -i -X POST http://127.0.0.1:8080/cgi-bin/error_test.py
 ```
+### Testing Redirections
+
+To test the route redirection functionality (e.g., redirecting `/old-route` to `/index.html`), run:
+
+# Check headers and 301 status code
+```bash
+curl -i http://127.0.0.1:8080/old-route
+```
+
+# Follow the redirection automatically to fetch the target page
+```bash
+curl -i -L http://127.0.0.1:8080/old-route
+```

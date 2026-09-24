@@ -29,13 +29,18 @@ impl Router {
 
     /// Checks if a given HTTP method is allowed for a specific route
     pub fn is_method_allowed(&self, route: &RouteConfig, method: &str) -> bool {
-        route.methods.iter().any(|m| m.eq_ignore_ascii_case(method))
+        if let Some(methods) = &route.methods {
+            methods.iter().any(|m| m.eq_ignore_ascii_case(method))
+        } else {
+            false
+        }
     }
 
     /// Resolves the file system path for a matched static route
     pub fn resolve_file_path(&self, route: &RouteConfig, request_path: &str) -> PathBuf {
+        let root = route.root.as_deref().unwrap_or("./public");
         let trimmed_path = request_path.strip_prefix(&route.path).unwrap_or(request_path);
-        let mut full_path = PathBuf::from(&route.root);
+        let mut full_path = PathBuf::from(root);
         
         if trimmed_path.is_empty() || trimmed_path == "/" {
             if let Some(ref default_file) = route.default_file {
@@ -46,6 +51,11 @@ impl Router {
         }
 
         full_path
+    }
+
+    /// Checks if a matched route defines a redirection path
+    pub fn get_redirection<'a>(&self, route: &'a RouteConfig) -> Option<&'a String> {
+        route.redirect.as_ref()
     }
 
     /// Checks if a request target and matched route qualify for CGI execution

@@ -105,4 +105,28 @@ routes:
         let response_500_str = String::from_utf8_lossy(response_500.as_bytes());
         assert!(response_500_str.contains("HTTP/1.1 500 Internal Server Error"));
     }
+
+    #[test]
+    fn test_route_redirection() {
+        let yaml_data = "
+server:
+  host: \"127.0.0.1\"
+  ports: [8080]
+  client_max_body_size: 1048576
+  error_pages:
+    404: \"error_pages/404.html\"
+routes:
+  - path: \"/old-route\"
+    redirect: \"/index.html\"
+";
+        let config: Config = serde_yaml::from_str(yaml_data).unwrap();
+        let router = Router::new(config);
+
+        let matched = router.match_route("/old-route");
+        assert!(matched.is_some());
+        
+        let route = matched.unwrap();
+        let redirection = router.get_redirection(route);
+        assert_eq!(redirection, Some(&"/index.html".to_string()));
+    }
 }

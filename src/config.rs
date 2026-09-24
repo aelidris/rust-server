@@ -23,11 +23,12 @@ pub struct ServerConfig {
 #[allow(dead_code)]
 pub struct RouteConfig {
     pub path: String,
-    pub root: String,
-    pub methods: Vec<String>,
+    pub root: Option<String>,
+    pub methods: Option<Vec<String>>,
     pub default_file: Option<String>,
-    pub directory_listing: bool,
+    pub directory_listing: Option<bool>,
     pub cgi_extensions: Option<Vec<String>>,
+    pub redirect: Option<String>,
 }
 
 impl Config {

@@ -14,14 +14,14 @@
     <h1>Rust HTTP Server Test Bench 🚀</h1>
     <p>Use the controls below to test your server features directly from the browser.</p>
 
-    <!-- 1. Static File & GET Test -->
+    <!-- Static File & GET Test -->
     <div class="section">
         <h3>1. Static File Serving (GET)</h3>
         <p>Test fetching a static resource.</p>
         <a href="/index.html" target="_blank"><button>Open index.html</button></a>
     </div>
 
-    <!-- 2. CGI POST Test -->
+    <!-- CGI POST Test -->
     <div class="section">
         <h3>2. CGI Execution (POST)</h3>
         <form action="/cgi-bin/post_test.py" method="POST">
@@ -30,12 +30,34 @@
         </form>
     </div>
 
-    <!-- 3. Error Page Tests (404 / 405) -->
+    <!-- Error Page Tests -->
     <div class="section">
         <h3>3. Error Handling Tests</h3>
         <p>Test triggering custom HTML error pages.</p>
-        <a href="/non_existent_page.html" target="_blank"><button>Test 404 Not Found</button></a>
-        <button onclick="test405MethodNotAllowed()">Test 405 Method Not Allowed</button>
+        
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+            <a href="/trigger_400" target="_blank"><button>Test 400 Bad Request</button></a>
+            <a href="/trigger_403" target="_blank"><button>Test 403 Forbidden</button></a>
+            <a href="/non_existent_page.html" target="_blank"><button>Test 404 Not Found</button></a>
+            <button onclick="testMethodError('POST')">Test 405 Method Not Allowed</button>
+            <button onclick="testPayloadError()">Test 413 Payload Too Large</button>
+            <a href="/trigger_500" target="_blank"><button>Test 500 Internal Server Error</button></a>
+        </div>
+    </div>
+
+    <!-- Redirection Test -->
+    <div class="section">
+        <h3>4. Route Redirection Test</h3>
+        <p>Test 301 Moved Permanently redirection.</p>
+        <a href="/old-route" target="_blank"><button>Test /old-route Redirect</button></a>
+    </div>
+
+    <!-- DELETE Method Test -->
+    <div class="section">
+        <h3>5. DELETE Method Test</h3>
+        <p>Test deleting a resource (e.g., delete_me.txt).</p>
+        <button onclick="testDelete()">Test DELETE</button>
+        <p id="delete-result" style="font-size: 0.9em; color: #555;"></p>
     </div>
 
     <script>
@@ -46,6 +68,32 @@
                   document.open();
                   document.write(html);
                   document.close();
+              });
+        }
+
+        function testPayloadError() {
+            // Sends a body larger than client_max_body_size (e.g., 2MB of 'A's)
+            const largeBody = 'A'.repeat(2 * 1024 * 1024);
+            fetch("/index.html", {
+                method: "POST",
+                body: largeBody
+            })
+              .then(res => res.text())
+              .then(html => {
+                  document.open();
+                  document.write(html);
+                  document.close();
+              });
+        }
+
+        function testDelete() {
+            fetch("/delete_me.txt", { method: "DELETE" })
+              .then(res => {
+                  document.getElementById("delete-result").innerText = 
+                      `Response Status: ${res.status} ${res.statusText}`;
+              })
+              .catch(err => {
+                  document.getElementById("delete-result").innerText = `Error: ${err}`;
               });
         }
     </script>

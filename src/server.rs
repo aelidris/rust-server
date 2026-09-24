@@ -171,6 +171,17 @@ impl Server {
                                         }
 
                                         if let Some(route) = self.router.match_route(path) {
+                                            // Check for redirection first
+                                            if let Some(redirect_target) = self.router.get_redirection(route) {
+                                                let response = format!(
+                                                    "HTTP/1.1 301 Moved Permanently\r\nLocation: {}\r\nContent-Length: 0\r\n\r\n",
+                                                    redirect_target
+                                                );
+                                                let _ = stream.write_all(response.as_bytes());
+                                                clients.remove(&id);
+                                                continue;
+                                            }
+                                            
                                             if self.router.is_method_allowed(route, method) {
                                                 let file_path = self.router.resolve_file_path(route, path);
                                                 println!("Matched route! Resolved path: {:?}", file_path);
